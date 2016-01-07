@@ -5,8 +5,6 @@ import random
 import time
 
 # Third-party dependencies
-# import dataset
-import giphypop
 import requests
 import tweepy
 from ttp import ttp
@@ -19,8 +17,6 @@ except:
 
 
 # Gloabl variable init
-# db = dataset.connect(config.db)
-# table = db['tweets']
 TWEET_LENGTH = 140
 IMAGE_URL_LENGTH = 23
 MAX_TWEET_TEXT_LENGTH = TWEET_LENGTH - IMAGE_URL_LENGTH - 1
@@ -28,13 +24,16 @@ DOTS = '...'
 BACKOFF = 0.5 # Initial wait time before attempting to reconnect
 MAX_BACKOFF = 300 # Maximum wait time between connection attempts
 MAX_IMAGE_SIZE = 3072 * 1024 # bytes
-USERNAME = 'slashgif'
+USERNAME = 'slashStock'
 
 # BLACKLIST
 # Do not respond to queries by these accounts
 BLACKLIST = [
     'pixelsorter',
-    'Lowpolybot'
+    'Lowpolybot',
+    'slashKareBear',
+    'slashgif',
+    'slashRemindMe'
 ]
 
 
@@ -44,12 +43,10 @@ logging.basicConfig(filename='logger.log',
 logger = logging.getLogger(__name__)
 
 
-# Giphy client
-giphy = giphypop.Giphy(api_key=config.giphy['key'])
 # Twitter client
 auth = tweepy.OAuthHandler(config.twitter['key'], config.twitter['secret'])
 auth.set_access_token(config.twitter['access_token'],
-    config.twitter['access_token_secret'])
+                      config.twitter['access_token_secret'])
 api = tweepy.API(auth)
 # Tweet parser
 parser = ttp.Parser()
@@ -147,8 +144,8 @@ class StreamListener(tweepy.StreamListener):
             return True
 
 
-if not os.path.exists('images/'):
-    os.makedirs('images/')
+if not os.path.exists('charts/'):
+    os.makedirs('charts/')
 
 stream_listener = StreamListener()
 stream = tweepy.Stream(auth=api.auth, listener=stream_listener)
