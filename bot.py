@@ -1,13 +1,17 @@
 # Built-in imports
+import datetime
 import logging
 import os
 import random
+import re
+import shutil
 import time
 
 # Third-party dependencies
 import requests
 import tweepy
 from ttp import ttp
+from yahoo_finance import Share
 
 # Custom imports
 try:
@@ -17,14 +21,24 @@ except:
 
 
 # Gloabl variable init
+DEFAULT_TIME_SPAN = '1d'
 TWEET_LENGTH = 140
 IMAGE_URL_LENGTH = 23
-MAX_TWEET_TEXT_LENGTH = TWEET_LENGTH - IMAGE_URL_LENGTH - 1
+STOCK_URL_LENGTH = 23
+MAX_TWEET_TEXT_LENGTH = TWEET_LENGTH - IMAGE_URL_LENGTH - STOCK_URL_LENGTH - 2
 DOTS = '...'
 BACKOFF = 0.5 # Initial wait time before attempting to reconnect
 MAX_BACKOFF = 300 # Maximum wait time between connection attempts
 MAX_IMAGE_SIZE = 3072 * 1024 # bytes
 USERNAME = 'slashStock'
+
+YAHOO_URL = 'http://finance.yahoo.com/q?s=%s'  # symbol
+CHART_API = 'http://chart.finance.yahoo.com/z?s=%s&t=%s&q=l&l=off&z=s'  # symbol, time
+
+SYMBOL_NOT_FOUND = '@%s I could not find "%s". Is it a real symbol?'
+STOCK_REPLY_TEMPLATE = ('$%s: $%s (%s%%)\n'   # symbol, price, change
+                        '%s\n\n'              # link
+                        '%s')                 # users
 
 # BLACKLIST
 # Do not respond to queries by these accounts
@@ -54,21 +68,36 @@ parser = ttp.Parser()
 backoff = BACKOFF
 
 
-def get_gif_filename(term):
-    images = [i for i in giphy.search(term, limit=20) if i.filesize < MAX_IMAGE_SIZE]
-    if not images or images is []:
-        return None
+def get_quote(symbol):
+    share = Share(symbol)
+    return {
+        'open': share.get_open(),
+        'price': share.get_price(),
+        'change': share.get_change()
+    }
 
-    image = images[0]
-    if not image:
-        return None
 
-    filename = 'images/%s.%s' % (term.replace(' ', '_'), image.type)
-    logging.info('get_gif_filename: %s--%s' % (term, filename))
+def strip_symbol(term):
+    return term.strip('$')
 
-    f = open(filename, 'wb')
-    f.write(requests.get(image.media_url).content)
-    f.close()
+
+def now_str():
+    now = datetime.datetime.now()
+    return now.strftime('%Y-%m-%d-%H-%M-%S-%f')
+
+
+def get_chart_filename(symbol, time_span):
+    r = requests.get(CHART_API % (symbol, time_span), stream=True)
+
+    filename = ''
+    if r.status_code == 200:
+        filename = 'charts/%s-%s.png' % (symbol, now_str())
+        with open(filename, 'wb') as f:
+            r.raw.decode_content = True
+            shutil.copyfileobj(r.raw, f)
+
+    logging.info('get_chart_filename: %s--%s--%s' % (symbol, time_span,
+                                                     filename))
     return filename
 
 
@@ -88,11 +117,23 @@ def parse_tweet(tweet_from, tweet_text):
         query = query.replace('%s' % url, '')
 
     logging.info('parse_tweet: %s--%s' % (tagged_users, query))
-    return tagged_users, query.strip()
+
+    splits = re.compile('\s+').split(query.strip())
+
+    symbol, time_span = splits[0].strip(), DEFAULT_TIME_SPAN
+
+    if len(splits) > 1:
+        time_span = splits[1].strip()
+
+    logging.info('parse_tweet: %s--%s--%s' % (tagged_users, symbol, time_span))
+    return tagged_users, strip_symbol(symbol), time_span
 
 
-def generate_reply_tweet(users, search_term):
-    reply = '%s %s' % (search_term, ' '.join(['@%s' % user for user in users if user != USERNAME]))
+def generate_reply_tweet(users, symbol, quote):
+    reply = STOCK_REPLY_TEMPLATE % (symbol.upper(),
+                                    quote['price'], quote['change'],
+                                    YAHOO_URL % symbol,
+                                    ' '.join(['@%s' % user for user in users if user != USERNAME]))
     if len(reply) > MAX_TWEET_TEXT_LENGTH:
         reply = reply[:MAX_TWEET_TEXT_LENGTH - len(DOTS) - 1] + DOTS
 
@@ -115,21 +156,34 @@ class StreamListener(tweepy.StreamListener):
             logging.info('on_status: %s--%s' % (tweet_id, tweet_text))
 
             # Parse tweet for search term
-            tagged_users, search_term = parse_tweet(tweet_from, tweet_text)
+            tagged_users, symbol, time_span = parse_tweet(tweet_from, tweet_text)
 
-            if search_term:
-                # Search and save the image
-                filename = get_gif_filename(search_term)
-                if filename:
-                    # Generate and send the the reply tweet
-                    reply_tweet = generate_reply_tweet(tagged_users, search_term)
-                    reply_status = api.update_with_media(filename=filename,
-                        status=reply_tweet, in_reply_to_status_id=tweet_id)
+            if symbol:
+                # Get the quote, or quit if invalid symbol
+                quote = get_quote(symbol)
+                logging.info('on_status_quote: %s' % quote)
 
-                    logging.info('on_status_sent: %s %s' % (
-                        reply_status.id_str, reply_status.text))
+                if not (quote['open'] and quote['price'] and quote['change']):
+                    # Symbol could be wrong. Send an error tweet
+                    err_tweet = SYMBOL_NOT_FOUND % (tweet_from, symbol)
+                    reply_status = api.update_status(status=err_tweet,
+                        in_reply_to_status_id=tweet_id)
+                    logging.info('on_err_status_sent: %s %s' % (
+                            reply_status.id_str, reply_status.text))
                 else:
-                    logging.info('on_status_failed: No images for %s' % search_term)
+                    # Search and save the image
+                    filename = get_chart_filename(symbol, time_span)
+
+                    if filename:
+                        # Generate and send the the reply tweet
+                        reply_tweet = generate_reply_tweet(tagged_users, symbol, quote)
+                        reply_status = api.update_with_media(filename=filename,
+                            status=reply_tweet, in_reply_to_status_id=tweet_id)
+
+                        logging.info('on_status_sent: %s %s' % (
+                            reply_status.id_str, reply_status.text))
+                    else:
+                        logging.info('on_status_failed: No images for %s' % symbol)
             else:
                 logging.info('on_status_failed: No search terms')
 
@@ -149,8 +203,8 @@ if not os.path.exists('charts/'):
 
 stream_listener = StreamListener()
 stream = tweepy.Stream(auth=api.auth, listener=stream_listener)
-try:
-    stream.userstream(_with='user', replies='all')
-except Exception as e:
-    logging.INFO('stream_exception: %s' % e)
-    raise e
+# try:
+stream.userstream(_with='user', replies='all')
+# except Exception as e:
+#     logging.INFO('stream_exception: %s' % e)
+#     raise e
