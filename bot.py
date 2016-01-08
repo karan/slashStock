@@ -203,8 +203,8 @@ if not os.path.exists('charts/'):
 
 stream_listener = StreamListener()
 stream = tweepy.Stream(auth=api.auth, listener=stream_listener)
-# try:
-stream.userstream(_with='user', replies='all')
-# except Exception as e:
-#     logging.INFO('stream_exception: %s' % e)
-#     raise e
+try:
+    stream.userstream(_with='user', replies='all')
+except Exception as e:
+    logging.INFO('stream_exception: %s' % e)
+    raise e
