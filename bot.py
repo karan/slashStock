@@ -30,7 +30,7 @@ DOTS = '...'
 BACKOFF = 0.5 # Initial wait time before attempting to reconnect
 MAX_BACKOFF = 300 # Maximum wait time between connection attempts
 MAX_IMAGE_SIZE = 3072 * 1024 # bytes
-USERNAME = 'slashStock'
+USERNAME = 'slashstock'
 
 YAHOO_URL = 'http://finance.yahoo.com/q?s=%s'  # symbol
 CHART_API = 'http://chart.finance.yahoo.com/z?s=%s&t=%s&q=l&l=off&z=s'  # symbol, time
@@ -44,10 +44,10 @@ STOCK_REPLY_TEMPLATE = ('$%s: $%s (%s%%)\n'   # symbol, price, change
 # Do not respond to queries by these accounts
 BLACKLIST = [
     'pixelsorter',
-    'Lowpolybot',
-    'slashKareBear',
+    'lowpolybot',
+    'slashkarebear',
     'slashgif',
-    'slashRemindMe'
+    'slashremindme'
 ]
 
 
@@ -152,11 +152,11 @@ class StreamListener(tweepy.StreamListener):
         tweet_text = status.text
         tweet_from = status.user.screen_name
 
-        if tweet_from != USERNAME and tweet_from not in BLACKLIST and not hasattr(status, 'retweeted_status'):
+        if tweet_from.lower() != USERNAME and tweet_from.lower() not in BLACKLIST and not hasattr(status, 'retweeted_status'):
             logging.info('on_status: %s--%s' % (tweet_id, tweet_text))
 
             # Parse tweet for search term
-            tagged_users, symbol, time_span = parse_tweet(tweet_from, tweet_text)
+            tagged_users, symbol, time_span = parse_tweet(tweet_from, tweet_text.lower())
 
             if symbol:
                 # Get the quote, or quit if invalid symbol
