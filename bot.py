@@ -36,9 +36,10 @@ YAHOO_URL = 'http://finance.yahoo.com/q?s=%s'  # symbol
 CHART_API = 'http://chart.finance.yahoo.com/z?s=%s&t=%s&q=l&l=off&z=s'  # symbol, time
 
 SYMBOL_NOT_FOUND = '@%s I could not find "%s". Is it a real symbol?'
-STOCK_REPLY_TEMPLATE = ('$%s: $%s (%s%%)\n'   # symbol, price, change
-                        '%s\n\n'              # link
-                        '%s')                 # users
+STOCK_REPLY_TEMPLATE = ('$%s: $%s (%s%%)\n'         # symbol, price, change
+                        'Mkt cap: $%s, P/E: %s\n'   # cap, pe
+                        '%s\n\n'                    # link
+                        '%s')                       # users
 
 # BLACKLIST
 # Do not respond to queries by these accounts
@@ -70,10 +71,13 @@ backoff = BACKOFF
 
 def get_quote(symbol):
     share = Share(symbol)
+
     return {
         'open': share.get_open(),
         'price': share.get_price(),
-        'change': share.get_change()
+        'change': share.get_change(),
+        'market_cap': share.get_market_cap(),
+        'pe': share.get_price_earnings_ratio() or '-'
     }
 
 
@@ -132,6 +136,7 @@ def parse_tweet(tweet_from, tweet_text):
 def generate_reply_tweet(users, symbol, quote):
     reply = STOCK_REPLY_TEMPLATE % (symbol.upper(),
                                     quote['price'], quote['change'],
+                                    quote['market_cap'], quote['pe'],
                                     YAHOO_URL % symbol,
                                     ' '.join(['@%s' % user for user in users if user != USERNAME]))
     if len(reply) > MAX_TWEET_TEXT_LENGTH:
