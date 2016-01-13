@@ -70,7 +70,7 @@ def create_image(share, chart_file, out_file):
                     draw(img)
                     draw.font_size = 20
                     draw.fill_color = Color(WHITE)
-                    draw.text(WIDTH-150, HEIGHT-WATERMARK_HEIGHT+50, '@slashStock')
+                    draw.text(WIDTH-150, HEIGHT-WATERMARK_HEIGHT+30, '@slashStock')
 
                     # Draw the chart
                     draw.composite(operator='add', left=0, top=0,
