@@ -186,7 +186,7 @@ class StreamListener(tweepy.StreamListener):
                 quote = get_quote(symbol)
                 logging.info('on_status_quote: %s' % quote)
 
-                if not (quote.get('open', None) and quote.get('price', None) and quote.get('change', None)):
+                if not (quote.get('open_price', None) and quote.get('price', None) and quote.get('change', None)):
                     # Symbol could be wrong. Send an error tweet
                     err_tweet = SYMBOL_NOT_FOUND % (tweet_from, symbol)
                     reply_status = api.update_status(status=err_tweet,
