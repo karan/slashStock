@@ -120,7 +120,7 @@ def get_out_filename(symbol, time_span, quote):
 
     logging.info('get_chart_filename: %s--%s--%s' % (symbol, time_span,
                                                      filename))
-    return filename
+    return final_filename
 
 
 def parse_tweet(tweet_from, tweet_text):
