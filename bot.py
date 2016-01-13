@@ -153,8 +153,7 @@ def parse_tweet(tweet_from, tweet_text):
 
 def generate_reply_tweet(users, symbol, quote):
     reply = STOCK_REPLY_TEMPLATE % (symbol.upper(),
-                                    quote['price'], quote['change'],
-                                    # quote['market_cap'], quote['pe'],
+                                    quote['price'], quote['change_percent'],
                                     YAHOO_URL % symbol,
                                     ' '.join(['@%s' % user for user in users if user != USERNAME]))
     if len(reply) > MAX_TWEET_TEXT_LENGTH:
