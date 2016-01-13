@@ -14,6 +14,7 @@ from ttp import ttp
 from yahoo_finance import Share
 
 # Custom imports
+from create_image import create_image
 try:
     import config
 except:
@@ -72,12 +73,27 @@ backoff = BACKOFF
 def get_quote(symbol):
     share = Share(symbol)
 
+    if not share.get_price():
+        return {}
+
+    change_f = float(share.get_change())
+    change_str = '+%.02f' % change_f if change_f >= 0 else '%.02f' % change_f
+
+    change_percent_f = change_f / float(share.get_open()) * 100
+    change_percent = '+%.02f' % change_percent_f if change_percent_f >= 0 else '%.02f' % change_percent_f
+
     return {
-        'open': share.get_open(),
         'price': share.get_price(),
-        'change': share.get_change(),
+        'change': change_str,
+        'change_percent': change_percent,
+        'open_price': share.get_open(),
         'market_cap': share.get_market_cap(),
-        'pe': share.get_price_earnings_ratio() or '-'
+        'year_low': share.get_year_low(),
+        'year_high': share.get_year_high(),
+        'day_low': share.get_days_low(),
+        'day_high': share.get_days_high(),
+        'volume': share.get_volume(),
+        'pe_ratio': share.get_price_earnings_ratio() or '-'
     }
 
 
@@ -90,15 +106,17 @@ def now_str():
     return now.strftime('%Y-%m-%d-%H-%M-%S-%f')
 
 
-def get_chart_filename(symbol, time_span):
+def get_out_filename(symbol, time_span, quote):
     r = requests.get(CHART_API % (symbol, time_span), stream=True)
 
     filename = ''
     if r.status_code == 200:
         filename = 'charts/%s-%s.png' % (symbol, now_str())
+        final_filename = 'charts/%s-%s-final.png' % (symbol, now_str())
         with open(filename, 'wb') as f:
             r.raw.decode_content = True
             shutil.copyfileobj(r.raw, f)
+        create_image(quote, filename, final_filename)
 
     logging.info('get_chart_filename: %s--%s--%s' % (symbol, time_span,
                                                      filename))
@@ -168,7 +186,7 @@ class StreamListener(tweepy.StreamListener):
                 quote = get_quote(symbol)
                 logging.info('on_status_quote: %s' % quote)
 
-                if not (quote['open'] and quote['price'] and quote['change']):
+                if not (quote.get('open', None) and quote.get('price', None) and quote.get('change', None)):
                     # Symbol could be wrong. Send an error tweet
                     err_tweet = SYMBOL_NOT_FOUND % (tweet_from, symbol)
                     reply_status = api.update_status(status=err_tweet,
@@ -177,7 +195,7 @@ class StreamListener(tweepy.StreamListener):
                             reply_status.id_str, reply_status.text))
                 else:
                     # Search and save the image
-                    filename = get_chart_filename(symbol, time_span)
+                    filename = get_out_filename(symbol, time_span, quote)
 
                     if filename:
                         # Generate and send the the reply tweet
