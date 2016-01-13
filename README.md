@@ -18,7 +18,7 @@ The bot understand commands in this format:
 ### Example
 
 * Amazon - `@slashStock AMZN`
-* Netflix - `Netlix is now in 130 countries. Damn! @slashStock $NFLX`
+* Netflix - `Netflix is now in 190 countries. Damn! @slashStock $NFLX`
 * S&P 500 - `@slashStock SPY 5y`
 * Greece ETF - `@slashStock GREK 2y`
 
