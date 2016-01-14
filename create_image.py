@@ -22,7 +22,7 @@ WATERMARK_HEIGHT = 50
 
 
 def comma(n):
-    locale.setlocale(locale.LC_ALL, 'en_US')
+    locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
     n = float(n)
     return locale.format("%.02f", n, grouping=True)
 
